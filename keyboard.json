@@ -9,16 +9,20 @@
     },
     "i2c": {
         "driver": "rp2040",
-        "pin_sda": "GP4",
-        "pin_scl": "GP5"
+        "pin_sda": "GP26",
+        "pin_scl": "GP27"
     },
     "processor": "RP2040",
-    "url": "",
+"url": "",                                      
     "usb": {
         "device_version": "1.0.0",
         "pid": "0x0001",
         "vid": "0xFEED"
     },
+    "matrix_pins": {
+    "rows": ["GP0", "GP1", "GP2", "GP3", "GP4", "GP5", "GP6", "GP7", "GP8", "GP9"],
+    "cols": ["GP10", "GP11", "GP12", "GP13", "GP14", "GP15", "GP16", "GP17"]
+},
     "layouts": {
         "LAYOUT": {
             "layout": [

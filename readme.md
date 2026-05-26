@@ -8,8 +8,8 @@
 
 Make example for this keyboard (after setting up your build environment):
 
-    make pibookintosh:default
-
+        make pibookintosh:default
+                                    
 Flashing example for this keyboard:
 
     make pibookintosh:default:flash

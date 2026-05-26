@@ -27,7 +27,7 @@
  * Initialize MCP23017 expander
  * Sets all pins as outputs and disables pull-ups
  */
-void mcp23017_init(void);
+void mcp23017_init(bool invert);
 
 /**
  * Write to MCP23017 register
@@ -35,6 +35,8 @@ void mcp23017_init(void);
  * @param value Value to write
  */
 void mcp23017_write(uint8_t reg, uint8_t value);
+void mcp23017_write_data_a(uint8_t value);
+void mcp23017_write_data_b(uint8_t value);
 
 /**
  * Read from MCP23017 register

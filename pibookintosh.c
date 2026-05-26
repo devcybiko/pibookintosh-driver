@@ -17,6 +17,9 @@ static const pin_t column_pins[NUM_COLS] = COL_PINS;
 static const pin_t meta_pins[NUM_META_KEYS] = META_PINS;
 static matrix_row_t pibookintosh_matrix[MATRIX_ROWS] __attribute__((used));
 
+#define ACTIVE_HIGH true
+#define ACTIVE_LOW false
+
 /* ===== Helper Functions ===== */
 
 /* Pre-initialization: I2C, MCP23017, and GPIO setup */
@@ -25,19 +28,22 @@ void pibookintosh_pre_init_kb(void) {
     i2c_init();
     
     // Initialize MCP23017
-    mcp23017_init();
+    mcp23017_init(ACTIVE_LOW);
     
     // Initialize pico LED
     gpio_set_pin_output(LED_PIN);
 }
 
 /* Read column inputs from Pico GPIO */
-static matrix_row_t read_cols(void) {
+static matrix_row_t read_cols(bool invert) {
     matrix_row_t cols = 0;
     for (uint8_t i = 0; i < NUM_COLS; i++) {
         if (gpio_read_pin(column_pins[i])) {
             cols |= (1 << i);
         }
+    }
+    if (!invert) {
+        cols = ~cols;
     }
     return cols;
 }
@@ -57,12 +63,12 @@ void pibookintosh_set_led_caps(bool on) {
 void pibookintosh_matrix_init(void) {
     // Initialize column pins as inputs
     for (uint8_t i = 0; i < NUM_COLS; i++) {
-        gpio_set_pin_input(column_pins[i]);
+        gpio_set_pin_input_low(column_pins[i]);
     }
     
     // Initialize meta-key pins as inputs
     for (uint8_t i = 0; i < NUM_META_KEYS; i++) {
-        gpio_set_pin_input(meta_pins[i]);
+        gpio_set_pin_input_low(meta_pins[i]);
     }
     
     // Clear matrix
@@ -80,19 +86,19 @@ uint8_t pibookintosh_matrix_scan(void) {
         // Activate row via MCP23017
         if (row < 8) {
             // Rows 0-7 use GPIOA
-            mcp23017_write(MCP23017_OLATA, 1 << row);
-            mcp23017_write(MCP23017_OLATB, 0x00);
+            mcp23017_write_data_a(1 << row);
+            mcp23017_write_data_b(0x00);
         } else {
             // Rows 8-9 use GPIOB (bits 0-1)
-            mcp23017_write(MCP23017_OLATA, 0x00);
-            mcp23017_write(MCP23017_OLATB, 1 << (row - 8));
+            mcp23017_write_data_a(0x00);
+            mcp23017_write_data_b(1 << (row - 8));
         }
         
         // Small delay for settling
         wait_us(30);
         
         // Read columns
-        matrix_row_t cols = read_cols();
+        matrix_row_t cols = read_cols(ACTIVE_HIGH);
         
         // Check if state changed
         if (pibookintosh_matrix[row] != cols) {
@@ -102,11 +108,10 @@ uint8_t pibookintosh_matrix_scan(void) {
     }
     
     // Deactivate all rows
-    mcp23017_write(MCP23017_OLATA, 0x00);
-    mcp23017_write(MCP23017_OLATB, 0x00);
+    mcp23017_write_data_a(0x00);
+    mcp23017_write_data_b(0x00);
     
     // Blink LED periodically
-    #define LED_PIN GP25
     uint32_t elapsed = timer_read32();
     if ((elapsed / 500) % 2 == 0) {
         gpio_write_pin_high(LED_PIN);
