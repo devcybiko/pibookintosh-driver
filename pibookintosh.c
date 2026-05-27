@@ -20,6 +20,13 @@ static matrix_row_t pibookintosh_matrix[MATRIX_ROWS] __attribute__((used));
 #define ACTIVE_HIGH true
 #define ACTIVE_LOW false
 
+/* LED pin definitions on MCP23017 GPIOB */
+#define MCP_LED_POWER     0x04  // GPIOB pin 2
+#define MCP_LED_CAPS      0x08  // GPIOB pin 3
+
+static uint8_t caps_lock_status = 0;
+static uint8_t power_led_status = 0;
+
 /* ===== Helper Functions ===== */
 
 /* Pre-initialization: I2C, MCP23017, and GPIO setup */
@@ -49,12 +56,13 @@ static matrix_row_t read_cols(bool invert) {
 }
 
 /* LED control helpers */
-void pibookintosh_set_led_power(bool on) {
-    mcp23017_set_led_power(on);
+void pibookintosh_set_power_led(bool on) {
+    power_led_status = on ? MCP_LED_POWER : 0;
 }
 
-void pibookintosh_set_led_caps(bool on) {
-    mcp23017_set_led_caps(on);
+/* Set caps lock LED state */
+void pibookintosh_set_caps_led(bool on) {
+    caps_lock_status = on ? MCP_LED_CAPS : 0;
 }
 
 /* ===== Matrix Implementation ===== */
@@ -77,6 +85,17 @@ void pibookintosh_matrix_init(void) {
     }
 }
 
+static void _write_row(uint16_t row) {
+    if (row < 8) {
+        // Rows 0-7 use GPIOA
+        mcp23017_write_data_a(1 << row);
+        mcp23017_write_data_b(0x00 | caps_lock_status | power_led_status);
+    } else {
+        // Rows 8-9 use GPIOB (bits 0-1)
+        mcp23017_write_data_a(0x00);
+        mcp23017_write_data_b((1 << (row - 8)) | caps_lock_status | power_led_status);
+    }
+}
 /* Matrix scan */
 uint8_t pibookintosh_matrix_scan(void) {
     bool changed = false;
@@ -84,15 +103,7 @@ uint8_t pibookintosh_matrix_scan(void) {
     // Scan each row
     for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
         // Activate row via MCP23017
-        if (row < 8) {
-            // Rows 0-7 use GPIOA
-            mcp23017_write_data_a(1 << row);
-            mcp23017_write_data_b(0x00);
-        } else {
-            // Rows 8-9 use GPIOB (bits 0-1)
-            mcp23017_write_data_a(0x00);
-            mcp23017_write_data_b(1 << (row - 8));
-        }
+        _write_row(row);
         
         // Small delay for settling
         wait_us(30);
@@ -107,17 +118,18 @@ uint8_t pibookintosh_matrix_scan(void) {
         }
     }
     
-    // Deactivate all rows
-    mcp23017_write_data_a(0x00);
-    mcp23017_write_data_b(0x00);
-    
     // Blink LED periodically
     uint32_t elapsed = timer_read32();
     if ((elapsed / 500) % 2 == 0) {
         gpio_write_pin_high(LED_PIN);
+        pibookintosh_set_power_led(true);
     } else {
         gpio_write_pin_low(LED_PIN);
+        pibookintosh_set_power_led(false);
     }
+    // Deactivate all rows
+    mcp23017_write_data_a(0x00);
+    mcp23017_write_data_b(0x00 | caps_lock_status | power_led_status);
     
     return changed;
 }

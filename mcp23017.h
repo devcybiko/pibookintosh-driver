@@ -19,9 +19,6 @@
 /* MCP23017 I2C address (8-bit shifted) */
 #define MCP23017_ADDR     (0x20 << 1)
 
-/* LED pin definitions on MCP23017 GPIOB */
-#define MCP_LED_POWER     0x04  // GPIOB pin 2
-#define MCP_LED_CAPS      0x08  // GPIOB pin 3
 
 /**
  * Initialize MCP23017 expander

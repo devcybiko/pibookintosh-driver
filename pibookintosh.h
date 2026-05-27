@@ -15,5 +15,5 @@ uint8_t pibookintosh_matrix_scan(void);
 uint8_t pibookintosh_matrix_get_row(uint8_t row);
 
 /* LED helpers */
-void pibookintosh_set_led_power(bool on);
-void pibookintosh_set_led_caps(bool on);
+void pibookintosh_set_power_led(bool on);
+void pibookintosh_set_caps_led(bool on);

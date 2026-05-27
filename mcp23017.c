@@ -50,25 +50,3 @@ void mcp23017_init(bool invert) {
     mcp23017_write_data_a(0x00);
     mcp23017_write_data_b(0x00);
 }
-
-/* Set power LED state */
-void mcp23017_set_led_power(bool on) {
-    uint8_t val = mcp23017_read(MCP23017_OLATB);
-    if (on) {
-        val |= MCP_LED_POWER;
-    } else {
-        val &= ~MCP_LED_POWER;
-    }
-    mcp23017_write_data_b(val);
-}
-
-/* Set caps lock LED state */
-void mcp23017_set_led_caps(bool on) {
-    uint8_t val = mcp23017_read(MCP23017_OLATB);
-    if (on) {
-        val |= MCP_LED_CAPS;
-    } else {
-        val &= ~MCP_LED_CAPS;
-    }
-    mcp23017_write_data_b(val);
-}

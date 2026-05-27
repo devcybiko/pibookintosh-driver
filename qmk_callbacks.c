@@ -49,8 +49,7 @@ matrix_row_t matrix_get_row(uint8_t row) {
  * Handles Caps Lock and other LED state changes
  */
 bool led_update_kb(led_t led_state) {
-    pibookintosh_set_led_caps(led_state.caps_lock);
-    pibookintosh_set_led_power(true);  // Always on for now
+    pibookintosh_set_caps_led(led_state.caps_lock);
     return false;  // Skip default LED handling
 }
 
