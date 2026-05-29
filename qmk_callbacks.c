@@ -6,9 +6,6 @@
 #include "mcp23017.h"
 #include "pibookintosh.h"
 
-/* Pin definitions for LED */
-#define LED_PIN GP25
-
 /* ===== QMK Callbacks ===== */
 
 /**

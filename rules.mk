@@ -12,3 +12,6 @@ I2C_DRIVER_REQUIRED = yes
 
 # Project specific files
 SRC += mcp23017.c qmk_callbacks.c
+
+EXTRAKEY_ENABLE = yes
+RAW_ENABLE = yes

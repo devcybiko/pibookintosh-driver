@@ -9,13 +9,14 @@
 /* Pin definitions */
 #define LED_PIN           GP25
 #define COL_PINS          {GP6, GP7, GP8, GP9, GP10, GP11, GP12, GP13}
-#define META_PINS         {GP14, GP15, GP16, GP17, GP18, GP19, GP20}
+#define META_PINS         {GP16, GP17, GP18, GP19, GP20, GP21, GP22}
 #define NUM_COLS          8
 #define NUM_META_KEYS     7
 
 static const pin_t column_pins[NUM_COLS] = COL_PINS;
 static const pin_t meta_pins[NUM_META_KEYS] = META_PINS;
 static matrix_row_t pibookintosh_matrix[MATRIX_ROWS] __attribute__((used));
+static matrix_row_t meta_row = 0;
 
 #define ACTIVE_HIGH true
 #define ACTIVE_LOW false
@@ -26,6 +27,7 @@ static matrix_row_t pibookintosh_matrix[MATRIX_ROWS] __attribute__((used));
 
 static uint8_t caps_lock_status = 0;
 static uint8_t power_led_status = 0;
+static bool power_led_hid_controlled = false;  // Track if LED is controlled via HID
 
 /* ===== Helper Functions ===== */
 
@@ -42,7 +44,7 @@ void pibookintosh_pre_init_kb(void) {
 }
 
 /* Read column inputs from Pico GPIO */
-static matrix_row_t read_cols(bool invert) {
+static matrix_row_t _read_cols(bool invert) {
     matrix_row_t cols = 0;
     for (uint8_t i = 0; i < NUM_COLS; i++) {
         if (gpio_read_pin(column_pins[i])) {
@@ -76,7 +78,7 @@ void pibookintosh_matrix_init(void) {
     
     // Initialize meta-key pins as inputs
     for (uint8_t i = 0; i < NUM_META_KEYS; i++) {
-        gpio_set_pin_input_low(meta_pins[i]);
+        gpio_set_pin_input_high(meta_pins[i]);
     }
     
     // Clear matrix
@@ -109,7 +111,7 @@ uint8_t pibookintosh_matrix_scan(void) {
         wait_us(30);
         
         // Read columns
-        matrix_row_t cols = read_cols(ACTIVE_HIGH);
+        matrix_row_t cols = _read_cols(ACTIVE_HIGH);
         
         // Check if state changed
         if (pibookintosh_matrix[row] != cols) {
@@ -117,15 +119,30 @@ uint8_t pibookintosh_matrix_scan(void) {
             changed = true;
         }
     }
+
+    // Scan meta keys into virtual row
+    matrix_row_t new_meta = 0;
+    for (uint8_t i = 0; i < NUM_META_KEYS; i++) {
+        if (!gpio_read_pin(meta_pins[i])) {
+            new_meta |= (1 << i);
+        }
+    }
     
-    // Blink LED periodically
-    uint32_t elapsed = timer_read32();
-    if ((elapsed / 500) % 2 == 0) {
-        gpio_write_pin_high(LED_PIN);
-        pibookintosh_set_power_led(true);
-    } else {
-        gpio_write_pin_low(LED_PIN);
-        pibookintosh_set_power_led(false);
+    if (meta_row != new_meta) {
+        meta_row = new_meta;
+        changed = true;
+    }
+
+    // Blink LED periodically (unless controlled via HID)
+    if (!power_led_hid_controlled) {
+        uint32_t elapsed = timer_read32();
+        if ((elapsed / 500) % 2 == 0) {
+            gpio_write_pin_high(LED_PIN);
+            pibookintosh_set_power_led(true);
+        } else {
+            gpio_write_pin_low(LED_PIN);
+            pibookintosh_set_power_led(false);
+        }
     }
     // Deactivate all rows
     mcp23017_write_data_a(0x00);
@@ -136,8 +153,37 @@ uint8_t pibookintosh_matrix_scan(void) {
 
 /* Get matrix row */
 uint8_t pibookintosh_matrix_get_row(uint8_t row) {
-    if (row < MATRIX_ROWS) {
+    if (row < MATRIX_ROWS - 1) {
         return pibookintosh_matrix[row];
+    } else if (row == MATRIX_ROWS - 1) {
+        return meta_row;
     }
     return 0;
+}
+
+/* Raw HID handler for LED control */
+void raw_hid_receive(uint8_t *data, uint8_t length) {
+    if (length < 2) return;
+    
+    uint8_t command = data[0];
+    uint8_t value = data[1];
+    
+    if (command == 0x01) {  // LED control command
+        power_led_hid_controlled = true;
+        if (value == 0x00) {  // LED off
+            gpio_write_pin_low(LED_PIN);
+            pibookintosh_set_power_led(false);
+        } else if (value == 0x01) {  // LED on
+            gpio_write_pin_high(LED_PIN);
+            pibookintosh_set_power_led(true);
+        }
+    } else if (command == 0x02) {  // Release HID control (return to firmware blinking)
+        power_led_hid_controlled = false;
+    }
+    
+    // Send acknowledgment back
+    uint8_t response[32] = {0};
+    response[0] = command;
+    response[1] = 0xAA;  // ACK byte
+    raw_hid_send(response, 32);
 }

@@ -13,6 +13,7 @@ void pibookintosh_pre_init_kb(void);
 void pibookintosh_matrix_init(void);
 uint8_t pibookintosh_matrix_scan(void);
 uint8_t pibookintosh_matrix_get_row(uint8_t row);
+uint8_t pibookintosh_get_mods(void);
 
 /* LED helpers */
 void pibookintosh_set_power_led(bool on);
