@@ -185,5 +185,5 @@ void raw_hid_receive(uint8_t *data, uint8_t length) {
     uint8_t response[32] = {0};
     response[0] = command;
     response[1] = 0xAA;  // ACK byte
-    raw_hid_send(response, 32);
+    host_raw_hid_send(response, 32);
 }
