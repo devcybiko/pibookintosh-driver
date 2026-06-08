@@ -3,8 +3,10 @@
 
 #include "quantum.h"
 #include "i2c_master.h"
+#include "uart.h"
 #include "mcp23017.h"
 #include "pibookintosh.h"
+#include "printf.h"
 
 /* Pin definitions */
 #define LED_PIN           GP25
@@ -12,6 +14,9 @@
 #define META_PINS         {GP16, GP17, GP18, GP19, GP20, GP21, GP22}
 #define NUM_COLS          8
 #define NUM_META_KEYS     7
+
+/* UART settings for touchpad */
+#define TOUCHPAD_BAUD      9600
 
 static const pin_t column_pins[NUM_COLS] = COL_PINS;
 static const pin_t meta_pins[NUM_META_KEYS] = META_PINS;
@@ -29,7 +34,32 @@ static uint8_t caps_lock_status = 0;
 static uint8_t power_led_status = 0;
 static bool power_led_hid_controlled = false;  // Track if LED is controlled via HID
 
+/* Touchpad state */
+static int8_t touchpad_dx = 0;  // Relative X movement
+static int8_t touchpad_dy = 0;  // Relative Y movement
+static uint8_t touchpad_buttons = 0;  // Button state
+static uint8_t touchpad_packet[5] = {0};
+static uint8_t touchpad_packet_index = 0;
+
 /* ===== Helper Functions ===== */
+static void _blink_led(void) {
+    // Blink LED periodically (unless controlled via HID)
+    if (!power_led_hid_controlled) {
+        uint32_t elapsed = timer_read32();
+        if ((elapsed / 500) % 2 == 0) {
+            gpio_write_pin_high(LED_PIN);
+            pibookintosh_set_power_led(true);
+        } else {
+            gpio_write_pin_low(LED_PIN);
+            pibookintosh_set_power_led(false);
+        }
+    }
+}
+
+/* Debug: Send string as keyboard events */
+static void debug_send_string(const char *str) {
+    SEND_STRING_DELAY(str, 1);  // 10ms delay between keys
+}
 
 /* Pre-initialization: I2C, MCP23017, and GPIO setup */
 void pibookintosh_pre_init_kb(void) {
@@ -41,6 +71,12 @@ void pibookintosh_pre_init_kb(void) {
     
     // Initialize pico LED
     gpio_set_pin_output(LED_PIN);
+    
+    // Initialize UART0 for touchpad (9600 baud, 8N1)
+    uart_init(TOUCHPAD_BAUD);
+    
+    // Wait for touchpad to be ready
+    wait_ms(100);
 }
 
 /* Read column inputs from Pico GPIO */
@@ -65,6 +101,47 @@ void pibookintosh_set_power_led(bool on) {
 /* Set caps lock LED state */
 void pibookintosh_set_caps_led(bool on) {
     caps_lock_status = on ? MCP_LED_CAPS : 0;
+}
+
+/* Read and parse touchpad UART data (non-blocking, one byte per call) */
+static void touchpad_process(void) {
+    char debug_str[64];
+    // Only read one byte per scan to avoid blocking
+    if (!uart_available()) {
+        _blink_led();
+        return;
+    }
+    
+    gpio_write_pin_high(LED_PIN);
+    uint8_t byte = uart_read();
+    // Sync on 0xFF byte
+    if (byte & 0x80) {
+        touchpad_packet[0] = byte;
+        touchpad_packet_index = 1;
+    } else if (touchpad_packet_index > 0 && touchpad_packet_index < sizeof(touchpad_packet)) {
+        touchpad_packet[touchpad_packet_index] = byte;
+        touchpad_packet_index++;
+        
+        // Process complete packet
+        if (touchpad_packet_index == sizeof(touchpad_packet)) {
+            // y1=read(1)
+            // x1=read(1)
+            // y0=read(1)
+            // x0=read(1)
+            touchpad_dx = (int8_t)touchpad_packet[4];      // X movement (signed)
+            touchpad_dy = (int8_t)touchpad_packet[3];      // Y movement (signed, negate if needed)
+            
+            // Sign-extend from 7-bit to 8-bit signed
+            if (touchpad_dx & 0x40) touchpad_dx |= 0x80;
+            if (touchpad_dy & 0x40) touchpad_dy |= 0x80;
+
+            touchpad_buttons = touchpad_packet[0] & 0x07;         // Button state            
+            touchpad_packet_index = 0;
+            // snprintf(debug_str, sizeof(debug_str), "%d, %d, %d, %d, %d\n", touchpad_packet[0], touchpad_packet[1], touchpad_packet[2], touchpad_packet[3], touchpad_packet[4]);
+            // // snprintf(debug_str, sizeof(debug_str), "dx=%d, dy=%d, buttons=0x%02X\n", touchpad_dx, touchpad_dy, touchpad_buttons);
+            // debug_send_string(debug_str);
+        }
+    }
 }
 
 /* ===== Matrix Implementation ===== */
@@ -98,10 +175,10 @@ static void _write_row(uint16_t row) {
         mcp23017_write_data_b((1 << (row - 8)) | caps_lock_status | power_led_status);
     }
 }
+
 /* Matrix scan */
 uint8_t pibookintosh_matrix_scan(void) {
     bool changed = false;
-    
     // Scan each row
     for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
         // Activate row via MCP23017
@@ -133,17 +210,22 @@ uint8_t pibookintosh_matrix_scan(void) {
         changed = true;
     }
 
-    // Blink LED periodically (unless controlled via HID)
-    if (!power_led_hid_controlled) {
-        uint32_t elapsed = timer_read32();
-        if ((elapsed / 500) % 2 == 0) {
-            gpio_write_pin_high(LED_PIN);
-            pibookintosh_set_power_led(true);
-        } else {
-            gpio_write_pin_low(LED_PIN);
-            pibookintosh_set_power_led(false);
-        }
+    // Process touchpad UART data and send mouse reports
+    touchpad_process();
+    if (touchpad_dx != 0 || touchpad_dy != 0 || touchpad_buttons != 0) {
+        report_mouse_t mouse_report = {0};
+        mouse_report.x = touchpad_dx;
+        mouse_report.y = -touchpad_dy;  // Invert Y if needed (depends on touchpad orientation)
+        mouse_report.buttons = touchpad_buttons;
+        host_mouse_send(&mouse_report);
+        
+        // Reset movement after sending
+        touchpad_dx = 0;
+        touchpad_dy = 0;
     }
+
+    // _blink_led();
+
     // Deactivate all rows
     mcp23017_write_data_a(0x00);
     mcp23017_write_data_b(0x00 | caps_lock_status | power_led_status);

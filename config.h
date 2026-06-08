@@ -16,4 +16,8 @@
 #define I2C1_SDA_PIN GP26
 #define I2C1_SCL_PIN GP27
 
+/* UART settings for Synaptics TM41T touchpad */
+#define UART0_TX_PIN GP0
+#define UART0_RX_PIN GP1
+
 #define FORCE_NKRO

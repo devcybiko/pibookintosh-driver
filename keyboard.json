@@ -12,6 +12,11 @@
         "pin_sda": "GP26",
         "pin_scl": "GP27"
     },
+    "uart": {
+        "driver": "rp2040",
+        "tx_pin": "GP0",
+        "rx_pin": "GP1"
+    },
     "processor": "RP2040",
     "url": "",
     "usb": {
