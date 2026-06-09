@@ -1,3 +1,5 @@
+#pragma once
+
 #include <stdint.h>
 
 typedef struct pitouch {
@@ -9,9 +11,10 @@ typedef struct pitouch {
     int16_t baud; // Default baud rate
     uint8_t packet_index;
     uint8_t packet[5];
+    void *user_data; // Optional user data pointer for callbacks
 } PiTouch;
 
-extern void pitouch_init(PiTouch *touch);
+extern void pitouch_init(PiTouch *touch, void *user_data);
 extern void pitouch_start(PiTouch *touch);
 extern void pitouch_callback(PiTouch *touch);
-extern void pitouch_task(PiTouch *touch);
+extern void pitouch_task(PiTouch *touch, void (*callback)(PiTouch *));

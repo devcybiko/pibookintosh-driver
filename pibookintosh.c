@@ -7,6 +7,7 @@
 #include "pibookintosh.h"
 #include "printf.h"
 #include "pitouch.h"
+#include "pimouse_emu.h"
 
 /* Pin definitions */
 #define LED_PIN           GP25
@@ -16,6 +17,7 @@
 #define NUM_META_KEYS     7
 
 PiTouch touchpad;
+PiMouseEmu mouse;
 
 static const pin_t column_pins[NUM_COLS] = COL_PINS;
 static const pin_t meta_pins[NUM_META_KEYS] = META_PINS;
@@ -65,7 +67,8 @@ void pibookintosh_pre_init_kb(void) {
     // Initialize pico LED
     gpio_set_pin_output(LED_PIN);
     
-    pitouch_init(&touchpad);
+    pimouse_init(&mouse);
+    pitouch_init(&touchpad, &mouse);
     pitouch_start(&touchpad);
 }
 
@@ -159,7 +162,7 @@ uint8_t pibookintosh_matrix_scan(void) {
         changed = true;
     }
 
-    pitouch_task(&touchpad);
+    pitouch_task(&touchpad, pimouse_callback);
 
     // _blink_led();
 

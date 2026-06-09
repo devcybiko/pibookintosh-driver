@@ -17,7 +17,7 @@ UART_DRIVER_REQUIRED = yes
 MOUSE_ENABLE = yes
 
 # Project specific files
-SRC += mcp23017.c qmk_callbacks.c pitouch.c
+SRC += mcp23017.c qmk_callbacks.c pitouch.c pimouse_emu.c
 
 EXTRAKEY_ENABLE = yes
 RAW_ENABLE = yes

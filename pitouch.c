@@ -3,7 +3,7 @@
 #include "uart.h"
 
 // initialize the PiTouch object
-void pitouch_init(PiTouch *touch) {
+void pitouch_init(PiTouch *touch, void *user_data) {
     touch->dx_scale = 10;
     touch->dy_scale = 10;
     touch->dx = 0;  // Relative X movement Invert X if needed (depends on touchpad orientation)
@@ -14,6 +14,7 @@ void pitouch_init(PiTouch *touch) {
     }
     touch->packet_index = 0;
     touch->baud = 9600; // Default baud rate
+    touch->user_data = user_data; // Store user data pointer
 }
 
 // Start the PiTouch task (initialize UART)
@@ -33,7 +34,7 @@ void pitouch_callback(PiTouch *touch) {
     }
 }
 
-void pitouch_task(PiTouch *touch) {
+void pitouch_task(PiTouch *touch, void (*callback)(PiTouch *)) {
     // Only read one byte per scan to avoid blocking
     if (!uart_available()) {
         return;
@@ -59,7 +60,7 @@ void pitouch_task(PiTouch *touch) {
 
             touch->buttons = touch->packet[0] & 0x07;         // Button state            
             touch->packet_index = 0;
-            pitouch_callback(touch);
+            if (callback) callback(touch);
             // Reset movement after sending
             touch->dx = 0;
             touch->dy = 0;
