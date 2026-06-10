@@ -16,8 +16,8 @@ static void debug_send_string(const char *str, ...) {
 
 // initialize the PiTouch object
 void pitouch_init(PiTouch *touch, void *user_data) {
-    touch->dx_scale = 10;
-    touch->dy_scale = 10;
+    touch->dx_scale = 5;
+    touch->dy_scale = 5;
     touch->dx = 0;  // Relative X movement Invert X if needed (depends on touchpad orientation)
     touch->dy = 0;  // Relative Y movement Invert Y if needed (depends on touchpad orientation)
     touch->buttons = 0;  // Button state
