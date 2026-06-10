@@ -1,6 +1,18 @@
 #include "quantum.h"
 #include "pitouch.h"
 #include "uart.h"
+#include <stdarg.h>
+
+/* Debug: Send string as keyboard events */
+static void debug_send_string(const char *str, ...) {
+    // Format the string with variable arguments
+    char buffer[128];
+    va_list args;
+    va_start(args, str);
+    vsnprintf(buffer, sizeof(buffer), str, args);
+    va_end(args);
+    SEND_STRING_DELAY(buffer, 1);  // 10ms delay between keys
+}
 
 // initialize the PiTouch object
 void pitouch_init(PiTouch *touch, void *user_data) {
@@ -29,7 +41,7 @@ void pitouch_callback(PiTouch *touch) {
         report_mouse_t mouse_report = {0};
         mouse_report.x = touch->dx_scale * touch->dx;
         mouse_report.y = touch->dy_scale * touch->dy;  
-        mouse_report.buttons = touch->buttons;
+        mouse_report.buttons = touch->buttons & 0x01; // Map to left button for simplicity
         host_mouse_send(&mouse_report);
     }
 }
@@ -58,8 +70,10 @@ void pitouch_task(PiTouch *touch, void (*callback)(PiTouch *)) {
             if (touch->dx & 0x40) touch->dx |= 0x80;
             if (touch->dy & 0x40) touch->dy |= 0x80;
 
-            touch->buttons = touch->packet[0] & 0x07;         // Button state            
+            // touch->buttons = touch->packet[0] & 0x07;         // Button state 
+            touch->buttons = touch->packet[0];         // Button state (only left button)           
             touch->packet_index = 0;
+            // debug_send_string("%d %d %d %d %d\n", touch->packet[0], touch->packet[1], touch->packet[2], touch->packet[3], touch->packet[4]);
             if (callback) callback(touch);
             // Reset movement after sending
             touch->dx = 0;

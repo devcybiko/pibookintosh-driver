@@ -62,7 +62,7 @@ void pimouse_callback(PiTouch *touch) {
             // }
         } else {
             // mouse move
-            if (0 * mouse->wheel_ms) {
+            if (mouse->wheel_ms) {
                 _mouse(mouse->mult_dx, mouse->WHEEL_DY * mouse->mult_dy, 0x04); // mouse.wheel()
             } else {
                 // mouse move

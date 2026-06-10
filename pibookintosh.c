@@ -162,9 +162,10 @@ uint8_t pibookintosh_matrix_scan(void) {
         changed = true;
     }
 
-    pitouch_task(&touchpad, pimouse_callback);
+    pitouch_task(&touchpad, pitouch_callback);
+    // pitouch_task(&touchpad, pimouse_callback);
 
-    // _blink_led();
+    _blink_led();
 
     // Deactivate all rows
     mcp23017_write_data_a(0x00);
